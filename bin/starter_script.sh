@@ -4,10 +4,10 @@
 
 THREAT_SCRIPT_PATH="/opt/splunk/etc/apps/optiv_TA_threat/bin/optiv_threat_lists.py"
 RSS_SCRIPT_PATH="/opt/splunk/etc/apps/optiv_TA_threat/bin/getalerts.py"
-LOG_FOLDER1="/opt/splunk/var/log/splunk"
+LOG_FOLDER1="/opt/splunk/etc/apps/optiv_TA_threat/logs"
 LOG_FOLDER2="/opt/splunk/etc/apps/optiv_TA_threat/bin"
 PYTHON="/opt/splunk/bin/splunk cmd python"
-MAX_DAYS_TO_KEEP=3
+MAX_DAYS_TO_KEEP=2
 
 echo "[*] My python exec command is: $PYTHON"
 echo "[*] My python threat list script is: $THREAT_SCRIPT_PATH"
@@ -15,7 +15,6 @@ echo "[*] My python get alerts script is: $RSS_SCRIPT_PATH"
 echo "[*] My log folder is: $LOG_FOLDER1"
 echo "[*] Keep log files for: $MAX_DAYS_TO_KEEP days."
 
- # call script via the interrupter
 echo "[*] Executing threat list script."
 $PYTHON $THREAT_SCRIPT_PATH
 echo "[*] Executing get alerts script."

@@ -6,7 +6,7 @@
 ##
 ##          Language:       Python
 ##
-##          Version:        3.25
+##          Version:        3.32
 ##
 ##          Original Date:  05-02-2015
 ##
@@ -32,11 +32,13 @@
 ##
 ##          Change Log:     05-01-2015 DPA      Created.
 ##                          08-08-2015 DPA      Added TOR, OpenBL, split out Palevo into its own function.
-##                          09-06-2015 DPA	Cross-platform enhancements.
-##			    09-17-2015 DPA	Added domains and URLs to the mix.
+##                          09-06-2015 DPA      Cross-platform enhancements.
+##                          09-17-2015 DPA      Added domains and URLs to the mix.
 ##                          03-19-2016 DPA      Added threat lists from AutoShun and CI Badguys
-##                          12-04-2016 DPA	More robust handling of AlienVault.
-##                          02-03-2017 DPA	3 new Ransomware lists. Disabled AutoShun.
+##                          12-04-2016 DPA      More robust handling of AlienVault.
+##                          02-03-2017 DPA      3 new Ransomware lists. Disabled AutoShun.
+##                          04-20-2017 DPA      Disabled Palevo and Binary Defense. Added conf file for urls.
+##                          05-02-2017 DPA      Enabled NoThink SSH Blacklist, Blocklist.de, and Darklist.de
 ##
 ##########################################################################################################################
 
@@ -59,74 +61,46 @@ if os.name == 'nt':
     ## Full path to python executable
     python_bin = 'C:\Program Files (x86)\Python-2.7-32bit\python.exe'
 else:
-    ## Full path to your Splunk installation
-    # For some reason:
-    #splunk_home = '/appl/opt/splunk_fwd/'
-    # For a sensible OS:
     splunk_home = '/opt/splunk'
 
-    ## Full path to python executable
-    # For Mac OS X:
-    #python_bin = '/Library/Frameworks/Python.framework/Versions/2.7/bin/python'
-    # For a sensible filesystem:
     python_bin = '/usr/bin/python'
 
-#Threat List URL's go here. Note that each list requires special parsing rules contained below.
-urlList = ['http://rules.emergingthreats.net/fwrules/emerging-Block-IPs.txt',
-           'http://rules.emergingthreats.net/blockrules/compromised-ips.txt',
-           'http://www.binarydefense.com/banlist.txt',
-           'https://sslbl.abuse.ch/blacklist/sslipblacklist.csv',
-           'https://reputation.alienvault.com/reputation.generic',
-           'https://zeustracker.abuse.ch/blocklist.php?download=ipblocklist',
-           'https://palevotracker.abuse.ch/blocklists.php?download=ipblocklist',
-           'http://malc0de.com/bl/IP_Blacklist.txt',
-           'https://check.torproject.org/exit-addresses',
-           'http://www.openbl.org/lists/base_1days.txt',
-           'http://avant.it-mate.co.uk/dl/Tools/hpHosts/hosts.txt',
-           'http://hosts-file.net/hphosts-partial.txt',
-           'https://isc.sans.edu/feeds/suspiciousdomains_High.txt',
-           'http://www.malwaredomainlist.com/hostslist/hosts.txt',
-           'https://openphish.com/feed.txt',
-           'http://data.phishtank.com/data/online-valid.csv',
-	   'http://osint.bambenekconsulting.com/feeds/c2-ipmasterlist.txt',
-           'http://www.talosintel.com/feeds/ip-filter.blf',
-	   'http://malc0de.com/bl/ZONES',
-	   'http://autoshun.org/files/shunlist.csv',
-	   'http://cinsscore.com/list/ci-badguys.txt',
-           'https://ransomwaretracker.abuse.ch/downloads/RW_IPBL.txt',
-           'https://ransomwaretracker.abuse.ch/downloads/RW_DOMBL.txt',
-           'https://ransomwaretracker.abuse.ch/downloads/RW_URLBL.txt']
 
-
-script_version = "3.25"
+script_version = "3.32"
 user_agent_string = "Optiv Threat Intel v" + script_version
+this_app_shortname = "optiv_TA_threat"
+
+urlList = []
+
+urlfile_name_txt = "threatlist_urls.conf"
+urlfile_name =  os.path.join(splunk_home, 'etc', 'apps', this_app_shortname, 'config', urlfile_name_txt)
 
 logfile_name_log =  "optiv_threat_lists_script" + strftime("%m-%d-%Y-%H-%M-%S", gmtime()) + ".log"
 logfile_name_txt = "optiv_threat_lists" + strftime("%m-%d-%Y-%H-%M-%S", gmtime()) + ".log"
 phishtank_logfile_name_log =  "optiv_phishtank" + strftime("%m-%d-%Y-%H-%M-%S", gmtime()) + ".log"
 hphosts_logfile_name_log =  "optiv_hphosts" + strftime("%m-%d-%Y-%H-%M-%S", gmtime()) + ".log"
-binarydefense_logfile_name_log =  "optiv_binarydefense" + strftime("%m-%d-%Y-%H-%M-%S", gmtime()) + ".log"
 alienvault_logfile_name_log =  "optiv_alienvault" + strftime("%m-%d-%Y-%H-%M-%S", gmtime()) + ".log"
 logfile_name_txt = "optiv_threat_lists" + strftime("%m-%d-%Y-%H-%M-%S", gmtime()) + ".log"
 bambenek_logfile_name_log =  "optiv_bambenek" + strftime("%m-%d-%Y-%H-%M-%S", gmtime()) + ".log"
 talos_logfile_name_log = "optiv_talos_intel" + strftime("%m-%d-%Y-%H-%M-%S", gmtime()) + ".log"
 ransomware_tracker_abuse_ch_log = "optiv_ransomware_tracker" + strftime("%m-%d-%Y-%H-%M-%S", gmtime()) + ".log"
+nothinkssh_log = "optiv_nothink_ssh" + strftime("%m-%d-%Y-%H-%M-%S", gmtime()) + ".log"
+blocklistde_log = "optiv_blocklist_de" + strftime("%m-%d-%Y-%H-%M-%S", gmtime()) + ".log"
+darklistde_log = "optiv_darklist_de" + strftime("%m-%d-%Y-%H-%M-%S", gmtime()) + ".log"
 
-'''
-logfile_name =  os.path.join(splunk_home, 'etc', 'apps', 'optiv_threat_intel', 'bin', logfile_name_log)
-outputfile_name =  os.path.join(splunk_home, 'etc', 'apps', 'optiv_threat_intel', 'bin', logfile_name_txt)
-'''
-logfile_name =  os.path.join(splunk_home, 'var', 'log', 'splunk', logfile_name_log)
-phishtank_logfile_name =  os.path.join(splunk_home, 'var', 'log', 'splunk', phishtank_logfile_name_log)
-bambenek_logfile_name = os.path.join(splunk_home, 'var', 'log', 'splunk', bambenek_logfile_name_log)
-hphosts_logfile_name =  os.path.join(splunk_home, 'var', 'log', 'splunk', hphosts_logfile_name_log)
-binarydefense_logfile_name =  os.path.join(splunk_home, 'var', 'log', 'splunk', binarydefense_logfile_name_log)
-alienvault_logfile_name =  os.path.join(splunk_home, 'var', 'log', 'splunk', alienvault_logfile_name_log)
-talos_logfile_name = os.path.join(splunk_home, 'var', 'log', 'splunk', talos_logfile_name_log)
-ransomware_tracker_logfile_name = os.path.join(splunk_home, 'var', 'log', 'splunk', ransomware_tracker_abuse_ch_log)
-outputfile_name =  os.path.join(splunk_home, 'var', 'log', 'splunk', logfile_name_txt)
+logfile_name =  os.path.join(splunk_home, 'etc', 'apps', this_app_shortname, 'logs', logfile_name_log)
+phishtank_logfile_name =  os.path.join(splunk_home, 'etc', 'apps', this_app_shortname, 'logs', phishtank_logfile_name_log)
+bambenek_logfile_name = os.path.join(splunk_home, 'etc', 'apps', this_app_shortname, 'logs', bambenek_logfile_name_log)
+hphosts_logfile_name =  os.path.join(splunk_home, 'etc', 'apps', this_app_shortname, 'logs', hphosts_logfile_name_log)
+alienvault_logfile_name =  os.path.join(splunk_home, 'etc', 'apps', this_app_shortname, 'logs', alienvault_logfile_name_log)
+talos_logfile_name = os.path.join(splunk_home, 'etc', 'apps', this_app_shortname, 'logs', talos_logfile_name_log)
+ransomware_tracker_logfile_name = os.path.join(splunk_home, 'etc', 'apps', 'logs', this_app_shortname, ransomware_tracker_abuse_ch_log)
+nothink_ssh_logfile_name = os.path.join(splunk_home, 'etc', 'apps', 'logs', this_app_shortname, nothinkssh_log)
+blocklistde_logfile_name = os.path.join(splunk_home, 'etc', 'apps', 'logs', this_app_shortname, blocklistde_log)
+darklistde_logfile_name = os.path.join(splunk_home, 'etc', 'apps', 'logs', this_app_shortname, darklistde_log)
+outputfile_name =  os.path.join(splunk_home, 'etc', 'apps', 'logs', this_app_shortname, logfile_name_txt)
 
-
+url_file = open(urlfile_name,'r')
 
 print "logfile_name: " + logfile_name
 
@@ -135,10 +109,25 @@ of = open(outputfile_name,'w')
 phishtank_lf = open(phishtank_logfile_name,'w')
 bambenek_lf = open(bambenek_logfile_name,'w')
 hphosts_lf = open(hphosts_logfile_name,'w')
-binarydefense_lf = open(binarydefense_logfile_name,'w')
 alienvault_lf = open(alienvault_logfile_name,'w')
 talos_lf = open(talos_logfile_name,'w')
 ransomware_lf = open(ransomware_tracker_logfile_name,'w')
+nothinkssh_lf = open(nothink_ssh_logfile_name,'w') 
+blocklistde_lf = open(blocklistde_logfile_name,'w')
+darklistde_lf = open(darklistde_logfile_name,'w')
+
+#Threat List URL's go here. Note that each list requires special parsing rules contained below.
+for url in url_file.readlines():
+    url = url.strip('\n')
+
+    url_formatted = url.split(',')
+
+    url = url_formatted[0]
+
+    is_url = re.match( r'^(http|https)\:', url, re.I)
+    if is_url:
+        #print "[*] Reading from URL: " + url
+        urlList.append(url)
 
 def getUrl(url,use_user_agent_bool):
 
@@ -212,13 +201,13 @@ def parseRansomwareAbuseCHIPlist(urlResults):
 
     ransomwareAbuseIPNoHeaders = ransomwareAbuseIPResults[2:]
 
-    for line in ransomwareAbuseIPNoHeaders:    
-	parseRansomwareLine = line.split('\n')
-        
-	for line in parseRansomwareLine:
-	    #print "line: " + str(line)
-            if (len(line) > 2):
-               ransomwareAbuseIP_formatted.append("dest_ip=" + str(line) + " threat_list_name=ransomware_Abuse_CH_IPs" )
+    for line in ransomwareAbuseIPNoHeaders:
+        parseRansomwareLine = line.split('\n')
+
+    for line in parseRansomwareLine:
+        #print "line: " + str(line)
+        if (len(line) > 2):
+            ransomwareAbuseIP_formatted.append("dest_ip=" + str(line) + " threat_list_name=ransomware_Abuse_CH_IPs" )
 
     print "Finished retrieving " + str(len(ransomwareAbuseIP_formatted)) + " Ransomware Abuse CH IPs."
     lf.write('\nThreat list written to at: ' + strftime("%m-%d-%Y %H:%M:%S", gmtime()) + ' GMT')
@@ -239,15 +228,72 @@ def parseRansomwareAbuseCHDomainlist(urlResults):
         parseRansomwareLine = line.split('\n')
 
         for line in parseRansomwareLine:
-            #print "line: " + str(line)
-            if (len(line) > 2):
-               ransomwareAbuseDomain_formatted.append("dest=" + str(line) + " threat_list_name=ransomware_Abuse_CH_domains" )
+            #if (len(line) > 3):
+            if (len(line) > 3 and not line.lstrip().startswith('#')):
+                ransomwareAbuseDomain_formatted.append("dest=" + str(line) + " threat_list_name=ransomware_Abuse_CH_domains" )
 
     print "Finished retrieving " + str(len(ransomwareAbuseDomain_formatted)) + " Ransomware Abuse CH Domains."
     lf.write('\nThreat list written to at: ' + strftime("%m-%d-%Y %H:%M:%S", gmtime()) + ' GMT')
     ransomware_lf.write('\nThreat list written to at: ' + strftime("%m-%d-%Y %H:%M:%S", gmtime()) + ' GMT')
     ransomware_lf.write( "\n".join(ransomwareAbuseDomain_formatted))
     lf.write('\nRetrieved ' + str(len(ransomwareAbuseDomain_formatted)) + ' Ransomware Abuse CH Domains.')
+
+def parseNoThinkSSHBlacklist(urlResults):
+    nothinkSSHIPIP = ['']
+    nothinkSSHIPIP_formatted = ['']
+    
+    nothinkSSHIPIP = urlResults.split('\n')
+
+    for dest_ip in nothinkSSHIPIP[3:]:
+        if (len(dest_ip) > 3):
+            is_ip = re.search(r'^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}', dest_ip)
+            if is_ip:     
+                nothinkSSHIPIP_formatted.append("dest_ip=" + str(dest_ip) + " threat_list_name=no_think_ssh_blacklist_ips" )
+
+    print "Finished retrieving " + str(len(nothinkSSHIPIP_formatted)) + " No Think SSH Blacklist IPs."
+    lf.write('\nThreat list written to at: ' + strftime("%m-%d-%Y %H:%M:%S", gmtime()) + ' GMT')
+    nothinkssh_lf.write('\nThreat list written to at: ' + strftime("%m-%d-%Y %H:%M:%S", gmtime()) + ' GMT')
+    nothinkssh_lf.write( "\n".join(nothinkSSHIPIP_formatted))
+    lf.write('\nRetrieved ' + str(len(nothinkSSHIPIP_formatted)) + ' No Think SSH Blacklist IPs.')
+
+def parseBlocklistde(urlResults):
+    blocklistdeIP = ['']
+    blocklistdeIP_formatted = ['']
+
+    blocklistdeIP = urlResults.split('\n')
+
+    for dest_ip in blocklistdeIP:
+        if (len(dest_ip) > 3):
+            is_ip = re.search(r'^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}', dest_ip)
+            if is_ip:
+                blocklistdeIP_formatted.append("dest_ip=" + str(dest_ip) + " threat_list_name=blocklist_de_ips" )
+
+    print "Finished retrieving " + str(len(blocklistdeIP_formatted)) + " Blocklist.de IPs."
+    lf.write('\nThreat list written to at: ' + strftime("%m-%d-%Y %H:%M:%S", gmtime()) + ' GMT')
+    blocklistde_lf.write('\nThreat list written to at: ' + strftime("%m-%d-%Y %H:%M:%S", gmtime()) + ' GMT')
+    blocklistde_lf.write( "\n".join(blocklistdeIP_formatted))
+    lf.write('\nRetrieved ' + str(len(blocklistdeIP_formatted)) + ' Blocklist.de IPs.')
+
+def parseDarklistde(urlResults):
+    darklistdeIP = ['']
+    darklistdeIP_formatted = ['']
+
+    darklistdeIP = urlResults.split('\n')
+
+    for dest_ip in darklistdeIP:
+        if (len(dest_ip) > 3):
+            is_ip = re.search(r'^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}', dest_ip)
+            if is_ip:
+                is_cidr = re.search(r'^(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}\/\d{1,2})',dest_ip)
+                if not is_cidr:
+                    darklistdeIP_formatted.append("dest_ip=" + str(dest_ip) + " threat_list_name=darklist_de_ips" )
+
+    print "Finished retrieving " + str(len(darklistdeIP_formatted)) + " Darklist.de IPs."
+    lf.write('\nThreat list written to at: ' + strftime("%m-%d-%Y %H:%M:%S", gmtime()) + ' GMT')
+    darklistde_lf.write('\nThreat list written to at: ' + strftime("%m-%d-%Y %H:%M:%S", gmtime()) + ' GMT')
+    darklistde_lf.write( "\n".join(darklistdeIP_formatted))
+    lf.write('\nRetrieved ' + str(len(darklistdeIP_formatted)) + ' Darklist.de IPs.')
+
 
 def parseRansomwareAbuseCHURLlist(urlResults):
     ransomwareAbuseURLNoHeaders = ['']
@@ -262,8 +308,7 @@ def parseRansomwareAbuseCHURLlist(urlResults):
         parseRansomwareLine = line.split('\n')
 
         for line in parseRansomwareLine:
-            #print "line: " + str(line)
-            if (len(line) > 2):
+            if (len(line) > 3):
                ransomwareAbuseURL_formatted.append("url=" + str(line) + " threat_list_name=ransomware_Abuse_CH_URLs" )
 
     print "Finished retrieving " + str(len(ransomwareAbuseURL_formatted)) + " Ransomware Abuse CH URLs."
@@ -293,9 +338,8 @@ def parseBambenekconsultingIPList(urlResults):
     for line in bambenekNoHeaders:
         parseBambenekLine = line.split('\n')
         for cell in parseBambenekLine:
-	    parseBambenekCell = cell.split(',')
-	    if (len(parseBambenekCell) > 2):
-                #print parseBambenekCell
+            parseBambenekCell = cell.split(',')
+            if (len(parseBambenekCell) > 2):
                 bambenekIP_formatted.append("dest_ip=" + parseBambenekCell[0] + " threat_list_name=bambenekIPs threat_description=\"" + parseBambenekCell[1] + "\" url=" + parseBambenekCell[3])
     print "Finished retrieving " + str(len(bambenekIP_formatted)) + " Bambenek IPs."
     lf.write('\nThreat list written to at: ' + strftime("%m-%d-%Y %H:%M:%S", gmtime()) + ' GMT')
@@ -313,16 +357,15 @@ def parsePhishTankURLList(urlResults):
     for csvrow in phishTankURL[1:-1]:
         phishTankRowSplit = ['']
         phishTankRowSplit = csvrow.split(',')
-        #print 'phishTankRowSplit: ' + str(phishTankRowSplit)
         if (len(phishTankRowSplit) > 7):
-            #print 'phish tank len: ' +str(len(phishTankRowSplit))
             if (phishTankRowSplit[4] != 'yes'):
                 phishTankRowSplit[4] = 'unknown'
             if (phishTankRowSplit[6] != 'yes'):
                 phishTankRowSplit[6] = 'unknown'
             if (len(phishTankRowSplit[2]) < 12):
                 phishTankRowSplit[2] = 'unknown'
-            phishTankURL_formatted.append('url=' + phishTankRowSplit[1] + ' threat_list_name=Phish_Tank_URLs verified=' + phishTankRowSplit[4] + ' spoofed_org=' + phishTankRowSplit[7] + ' phishing_site_online=' + phishTankRowSplit[6] + ' phish_tank_info_url=' + phishTankRowSplit[2])
+            phishTankURL_formatted.append('url=' + phishTankRowSplit[1].lstrip('"') + ' threat_list_name=Phish_Tank_URLs verified=' + phishTankRowSplit[4] + ' spoofed_org=' + phishTankRowSplit[7] + ' phishing_site_online=' + phishTankRowSplit[6] + ' phish_tank_info_url=' + phishTankRowSplit[2])
+            #phishTankURL_formatted.append('url=' + phishTankRowSplit[1] + ' threat_list_name=Phish_Tank_URLs verified=' + phishTankRowSplit[4] + ' spoofed_org=' + phishTankRowSplit[7] + ' phishing_site_online=' + phishTankRowSplit[6] + ' phish_tank_info_url=' + phishTankRowSplit[2])
 
 
     print "Finished retrieving " +str(len(phishTankURL_formatted))+ " Phish Tank URLs."
@@ -365,18 +408,10 @@ def parseMalwareDomainList(urlResults):
 
     x=0
 
-    #print "size n: " + str(len(n))
-
-
     for y in n:
-        #print "in for loop"
-        #print "y before loop: " + y
         if len(y) > 1:
             malwareDomain.append(('dest=' + n[x].strip().strip('\n') + ' threat_list_name=Malware_Domains').strip('\n') )
-            #print 'dest=' + n[x]
         x=x+1
-    #print "size n: " + str(len(n))
-    #print torExitNodeIPs
     print "Finished retrieving " +str(len(malwareDomain))+ " Malware Domains."
 
     lf.write('\nThreat list written to at: ' + strftime("%m-%d-%Y %H:%M:%S", gmtime()) + ' GMT')
@@ -392,15 +427,11 @@ def parseISCSANSSuspiciousDomainsList(urlResults):
 
     ISCSANSSuspiciousDomain = urlResults.split('Site\n')
     if len(ISCSANSSuspiciousDomain)>0:
-		ISCSANSSuspiciousDomain = ISCSANSSuspiciousDomain[1].split('\n')
+        ISCSANSSuspiciousDomain = ISCSANSSuspiciousDomain[1].split('\n')
 
-		for domain in ISCSANSSuspiciousDomain[:-11]:
-			ISCSANSSuspiciousDomain_formatted.append('dest=' + domain.strip() + ' threat_list_name=ISC_SANS_Suspicious')
-    #m = re.findall('^#Site^(.*?)^',urlResults,re.DOTALL|re.MULTILINE)
-    #m = re.findall('^(.*\..*|.*\..*\..*|.*\..*\..*\..*|.*\..*\..*\..*\..*?)',urlResults,re.DOTALL|re.MULTILINE)
-    #m = re.findall('^(((([A-Za-z0-9]+){1,63}\.)|(([A-Za-z0-9]+(\-)+[A-Za-z0-9]+){1,63}\.))+)$',urlResults,re.DOTALL|re.MULTILINE)
-    #m = re.findall('^(((.*\..*)|(.*\..*\..*)|(.*\..*\..*\..*)))$',urlResults,re.DOTALL|re.MULTILINE)
-    #m = re.findall('(.*\..*)',urlResults,re.DOTALL|re.MULTILINE)
+        for domain in ISCSANSSuspiciousDomain[:-11]:
+            ISCSANSSuspiciousDomain_formatted.append('dest=' + domain.strip() + ' threat_list_name=ISC_SANS_Suspicious')
+
 
     print "Finished retrieving " +str(len(ISCSANSSuspiciousDomain_formatted))+ " ISC SANS Suspicious Domains."
 
@@ -428,13 +459,8 @@ def parseHPHostsByMalwarebytesDomainList(urlResults):
     x=0
 
     for y in n:
-        #print "in for loop"
-        #print "y before loop: " + y
         if len(y) > 1:
-            #print 'y before split: ' + y
-            #y = y.split('   ')
-            #print 'y after split: ' +y
-            #HPHostsByMalwarebytesDomain_formatted.append(('domain=' + n[x] + ' threat_list_name=HPHostsByMalwareBytesDomains').strip('\n') )
+
             HPHostsByMalwarebytesDomain.append(('dest=' + n[x].strip().strip('\n') + ' threat_list_name=HP_Hosts_By_MalwareBytes').strip('\n') )
             #print 'dest=' + n[x]
         x=x+1
@@ -456,18 +482,15 @@ def parseMalc0deDomains(urlResults):
 
     for line in malcodeDomains:
         if (len(line) > 5):
-	    line_split = line.split('\"')
-	    if (len(line_split) > 1):
-		#print "line_split1: " + line_split[1]
-		malcodeDomains_formatted.append("dest=" + line_split[1] + " threat_list_name=malc0de_Domains")
+            line_split = line.split('\"')
+        if (len(line_split) > 1):
+            malcodeDomains_formatted.append("dest=" + line_split[1] + " threat_list_name=malc0de_Domains")
 
     print "Finished retrieving " + str(len(malcodeDomains_formatted)) + " Malc0de Domains."
     lf.write('\nThreat list written to at: ' + strftime("%m-%d-%Y %H:%M:%S", gmtime()) + ' GMT')
     of.write('\nThreat list written to at: ' + strftime("%m-%d-%Y %H:%M:%S", gmtime()) + ' GMT')
     of.write( "\n".join(malcodeDomains_formatted))
     lf.write('\nRetrieved ' + str(len(malcodeDomains_formatted)) + ' Malc0de Domains.')
-
-
 
 
 def parseTorBlockList(urlResults):
@@ -537,27 +560,7 @@ def parseZeus(urlResults):
     of.write( "\n".join(zeusIPs_formatted))
     lf.write('\nRetrieved ' + str(len(zeusIPs)) + ' IPs from Zeus')
 
-def parsePalevo(urlResults):
 
-
-    palevoIPs = urlResults.split('# Palevo C&C IP Blocklist by abuse.ch')
-
-    palevoIPs = palevoIPs[1].split('\n')
-
-    palevoIPs_formatted = ['']
-
-
-    for ip in palevoIPs:
-        palevoIPs_formatted.append('dest_ip=' + ip + ' threat_list_name=Palevo_CandC')
-
-
-    print "Finished retrieving " + str(len(palevoIPs)) + " IPs from Palevo."
-
-    #of.write(zeusIPs_formatted)
-    lf.write('\nThreat list written to at: ' + strftime("%m-%d-%Y %H:%M:%S", gmtime()) + ' GMT')
-    of.write('\nThreat list written to at: ' + strftime("%m-%d-%Y %H:%M:%S", gmtime()) + ' GMT')
-    of.write( "\n".join(palevoIPs_formatted))
-    lf.write('\nRetrieved ' + str(len(palevoIPs)) + ' IPs from Palevo')
 
 def parseEmergingThreatsBlockList(urlResults):
     m = re.findall('^#Spamhaus DROP Nets(.*?)^#Dshield Top Attackers',urlResults,re.DOTALL|re.MULTILINE)
@@ -579,30 +582,6 @@ def parseEmergingThreatsBlockList(urlResults):
     of.write( "\n".join(spamHausIPs_formatted))
     lf.write('\nRetrieved ' + str(len(spamHausIPs)) + ' IPs from SpamHaus')
 
-    ###############################
-    '''
-    n = re.findall('^# Palevo(.*?)^#Spamhaus DROP Nets',urlResults,re.DOTALL|re.MULTILINE)
-
-    palevoIPs = n[0].split()
-
-    palevoIPs_formatted = ['']
-
-    for ip in palevoIPs:
-        if len(ip) > 1:
-            palevoIPs_formatted.append('dest_ip=' + ip + ' threat_list_name=Palevo')
-
-
-    print "Finished retrieving " + str(len(palevoIPs)) + " IPs from Palevo."
-    #of.write(palevoIPs_formatted)
-
-    lf.write('\nThreat list written to at: ' + strftime("%m-%d-%Y %H:%M:%S", gmtime()) + ' GMT')
-    of.write('\nThreat list written to at: ' + strftime("%m-%d-%Y %H:%M:%S", gmtime()) + ' GMT')
-    of.write( "\n".join(palevoIPs_formatted))
-
-    lf.write('\nRetrieved ' + str(len(palevoIPs)) + ' IPs from Palevo')
-    '''
-
-    ###############################
 
     dshieldIPs = urlResults.split('#Dshield Top Attackers')
 
@@ -623,24 +602,7 @@ def parseEmergingThreatsBlockList(urlResults):
     lf.write('\nRetrieved ' + str(len(dshieldIPs)) + ' IPs from Dshield')
     ###############################
 
-    '''
-    o = re.findall('^# Zeus(.*?)^# Spyeye',urlResults,re.DOTALL|re.MULTILINE)
 
-    zeusIPs = o[0].split()
-    #print spamHausIPs
-    zeusIPs_formatted = ['']
-
-    for ip in zeusIPs:
-        zeusIPs_formatted.append('dest_ip=' + ip + ' threat_list_name=Zeus')
-
-
-    print "Finished retrieving " + str(len(zeusIPs)) + " IPs from Zeus."
-    #of.write(zeusIPs_formatted)
-    lf.write('\nThreat list written to at: ' + strftime("%m-%d-%Y %H:%M:%S", gmtime()) + ' GMT')
-    of.write('\nThreat list written to at: ' + strftime("%m-%d-%Y %H:%M:%S", gmtime()) + ' GMT')
-    of.write( "\n".join(zeusIPs_formatted))
-    lf.write('\nRetrieved ' + str(len(zeusIPs)) + ' IPs from Zeus')
-    '''
 
     ###############################
     p = re.findall('^# Feodo(.*?)^# Zeus',urlResults,re.DOTALL|re.MULTILINE)
@@ -811,12 +773,12 @@ def parseAutoshunIPs(urlResults):
 
     for line in autoshunIPs:
         if len(line) > 5:
-	    line_split = line.split(',')
-	    if (len(line_split) > 2):
-		#print "line_split0: " + line_split[0]
-		#print "line_split2: " + line_split[2]
-		threat_desc_no_spaces =re.sub(r' ', '_', line_split[2])
-		autoshunIPs_formatted.append("dest_ip=" + line_split[0] + " threat_list_name=autoshun_IPs threat_description=" + threat_desc_no_spaces)
+            line_split = line.split(',')
+        if (len(line_split) > 2):
+        #print "line_split0: " + line_split[0]
+        #print "line_split2: " + line_split[2]
+            threat_desc_no_spaces =re.sub(r' ', '_', line_split[2])
+            autoshunIPs_formatted.append("dest_ip=" + line_split[0] + " threat_list_name=autoshun_IPs threat_description=" + threat_desc_no_spaces)
 
 
     print "Finished retrieving "+ str(len(autoshunIPs)) +" AutoShun IPs."
@@ -834,11 +796,11 @@ def parseCI_Army_BadguysIPs(urlResults):
 
     for line in CI_Army_Badguys_IPs:
         if len(line) > 5:
-	    line_split = line.split('.')
-	    #print "len_line_split:" + str(len(line_split))
-	    if (len(line_split) > 3):
-		#threat_desc_no_spaces =re.sub(r' ', '_', line_split[2])
-		CI_Army_Badguys_IPs_formatted.append("dest_ip=" + line + " threat_list_name=CI_Army_Badguys_IPs")
+            line_split = line.split('.')
+        #print "len_line_split:" + str(len(line_split))
+        if (len(line_split) > 3):
+        #threat_desc_no_spaces =re.sub(r' ', '_', line_split[2])
+            CI_Army_Badguys_IPs_formatted.append("dest_ip=" + line + " threat_list_name=CI_Army_Badguys_IPs")
 
 
     print "Finished retrieving "+ str(len(CI_Army_Badguys_IPs)) +" CI Army Badguys IPs."
@@ -861,109 +823,96 @@ def main():
     print '[*] Script version: ' + script_version
     raw_threatlist = ""
 
-      #problem?
-    #raw_threatlist = getUrl(urlList[3].strip('\n'))
-    #print len(str(raw_threatlist))
-    #if len(str(raw_threatlist)) > 3:
-    #    parseAbuseCHSSLIPBLIPs(raw_threatlist)
 
     raw_threatlist = getUrl(urlList[0].strip('\n'),'true')
     if len(str(raw_threatlist)) > 3:
-    	parseEmergingThreatsBlockList(raw_threatlist)
+        parseEmergingThreatsBlockList(raw_threatlist)
 
     raw_threatlist = getUrl(urlList[1].strip('\n'),'true')
     if len(str(raw_threatlist)) > 3:
         parseEmergingThreatsCompromisedIPs(raw_threatlist)
 
-    raw_threatlist = getUrl(urlList[2].strip('\n'),'true')
-    if len(str(raw_threatlist)) > 3:
-        parseBinaryDefenseIPs(raw_threatlist)
-
-    raw_threatlist = getUrl(urlList[7].strip('\n'),'true')
+    raw_threatlist = getUrl(urlList[5].strip('\n'),'true')
     if len(str(raw_threatlist)) > 3:
         parseMalc0deIPs(raw_threatlist)
 
-    raw_threatlist = getUrl(urlList[4].strip('\n'),'false')
+    raw_threatlist = getUrl(urlList[3].strip('\n'),'false')
     if len(str(raw_threatlist)) > 3:
         parseAlienVault(raw_threatlist)
 
-    raw_threatlist = getUrl(urlList[8].strip('\n'),'true')
+    raw_threatlist = getUrl(urlList[6].strip('\n'),'true')
     if len(str(raw_threatlist)) > 3:
         parseTorBlockList(raw_threatlist)
 
-    raw_threatlist = getUrl(urlList[5].strip('\n'),'true')
+    raw_threatlist = getUrl(urlList[4].strip('\n'),'true')
     if len(str(raw_threatlist)) > 3:
         parseZeus(raw_threatlist)
 
-    raw_threatlist = getUrl(urlList[6].strip('\n'),'true')
-    if len(str(raw_threatlist)) > 3:
-        parsePalevo(raw_threatlist)
+    #raw_threatlist = getUrl(urlList[7].strip('\n'),'true')
+    #if len(str(raw_threatlist)) > 3:
+    #    parseOpenBL(raw_threatlist)
 
-    raw_threatlist = getUrl(urlList[9].strip('\n'),'true')
-    if len(str(raw_threatlist)) > 3:
-        parseOpenBL(raw_threatlist)
-
-    raw_threatlist = getUrl(urlList[10].strip('\n'),'false')
+    raw_threatlist = getUrl(urlList[8].strip('\n'),'false')
     if len(str(raw_threatlist)) > 3:
         parseHPHostsByMalwarebytesDomainList(raw_threatlist)
 
-    raw_threatlist = getUrl(urlList[13].strip('\n'),'false')
+    raw_threatlist = getUrl(urlList[11].strip('\n'),'false')
     if len(str(raw_threatlist)) > 3:
         parseMalwareDomainList(raw_threatlist)
 
-    raw_threatlist = getUrl(urlList[12].strip('\n'),'true')
+    raw_threatlist = getUrl(urlList[10].strip('\n'),'true')
     if len(str(raw_threatlist)) > 3:
         parseISCSANSSuspiciousDomainsList(raw_threatlist)
 
-    raw_threatlist = getUrl(urlList[14].strip('\n'),'false')
+    raw_threatlist = getUrl(urlList[12].strip('\n'),'false')
     if len(str(raw_threatlist)) > 3:
         parseOpenPhishURLList(raw_threatlist)
 
-    raw_threatlist = getUrl(urlList[15].strip('\n'),'true')
+    raw_threatlist = getUrl(urlList[13].strip('\n'),'true')
     if len(str(raw_threatlist)) > 3:
         parsePhishTankURLList(raw_threatlist)
 
-    #raw_threatlist = getUrl(urlList[0].strip('\n'),'true')
+    raw_threatlist = getUrl(urlList[14].strip('\n'),'true')
+    if len(str(raw_threatlist)) > 3:
+        parseBambenekconsultingIPList(raw_threatlist)
+
+    raw_threatlist = getUrl(urlList[15].strip('\n'),'true')
+    if len(str(raw_threatlist)) > 3:
+         parseTalosIntel(raw_threatlist)
+
     raw_threatlist = getUrl(urlList[16].strip('\n'),'true')
     if len(str(raw_threatlist)) > 3:
-	parseBambenekconsultingIPList(raw_threatlist)
+         parseMalc0deDomains(raw_threatlist)
 
     raw_threatlist = getUrl(urlList[17].strip('\n'),'true')
 
     if len(str(raw_threatlist)) > 3:
-         parseTalosIntel(raw_threatlist)
-
-
-    raw_threatlist = getUrl(urlList[18].strip('\n'),'true')
-
-    if len(str(raw_threatlist)) > 3:
-         parseMalc0deDomains(raw_threatlist)
-
-    #raw_threatlist = getUrl(urlList[19].strip('\n'),'true')
-
-    #if len(str(raw_threatlist)) > 3:
-    #     parseAutoshunIPs(raw_threatlist)
-
-    raw_threatlist = getUrl(urlList[20].strip('\n'),'true')
-
-    if len(str(raw_threatlist)) > 3:
          parseCI_Army_BadguysIPs(raw_threatlist)
 
-    raw_threatlist = getUrl(urlList[21].strip('\n'),'true')
+    raw_threatlist = getUrl(urlList[18].strip('\n'),'true')
     if len(str(raw_threatlist)) > 3:
          parseRansomwareAbuseCHIPlist(raw_threatlist)
 
-    raw_threatlist = getUrl(urlList[22].strip('\n'),'true')
+    raw_threatlist = getUrl(urlList[19].strip('\n'),'true')
     if len(str(raw_threatlist)) > 3:
          parseRansomwareAbuseCHDomainlist(raw_threatlist)
 
-    raw_threatlist = getUrl(urlList[23].strip('\n'),'true')
+    raw_threatlist = getUrl(urlList[20].strip('\n'),'true')
     if len(str(raw_threatlist)) > 3:
          parseRansomwareAbuseCHURLlist(raw_threatlist)
 
+    raw_threatlist = getUrl(urlList[21].strip('\n'),'true')
+    if len(str(raw_threatlist)) > 3:
+         parseNoThinkSSHBlacklist(raw_threatlist)
+
+    raw_threatlist = getUrl(urlList[22].strip('\n'),'true')
+    if len(str(raw_threatlist)) > 3:
+         parseBlocklistde(raw_threatlist)
+
+    raw_threatlist = getUrl(urlList[23].strip('\n'),'true')
+    if len(str(raw_threatlist)) > 3:
+         parseDarklistde(raw_threatlist)
+
 
 if __name__ == '__main__':
-	main()
-
-
-
+    main()

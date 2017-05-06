@@ -7,6 +7,7 @@ Language:		Python
 Author:			Derek P. Arnold
 Original Date:		12-26-2013
 Revision History:	12-26-2013 Created
+                        05-06-2017 Moved log files to base directory, moved config to config directory
 ******************************************************************************************************
 '''
 
@@ -43,12 +44,11 @@ else:
     # For a sensible filesystem:
     python_bin = '/usr/bin/python'
 
-urlfile_name_txt = "url.txt"
+urlfile_name_txt = "news_urls.conf"
 
-urlfile_name =  os.path.join(splunk_home, 'etc', 'apps', 'optiv_TA_threat', 'bin', urlfile_name_txt)
+urlfile_name =  os.path.join(splunk_home, 'etc', 'apps', 'optiv_TA_threat', 'config', urlfile_name_txt)
 
 
-#urlList = ['http://www.us-cert.gov/ncas/current-activity.xml','http://feeds.wired.com/wired27b','http://feeds.feedburner.com/nakedsecurity?format=xml','http://www.darkreading.com/rss/all.xml','http://feeds.feedburner.com/SansInstituteNewsbites?format=xml']
 urlList = []
 titleList = []
 pubDateList = []
@@ -58,13 +58,12 @@ descList = []
 urlFile = open(urlfile_name,'r')
 #urlFile = open("./url.txt",'r')
 
-#strftime("%Y-%m-%d %H:%M:%S", gmtime())
 
 logfile_name_end = "getalerts" + strftime("%m-%d-%Y-%H-%M-%S", gmtime()) + ".log"
 
-logfile_name =  os.path.join(splunk_home, 'etc', 'apps', 'optiv_TA_threat', 'bin', logfile_name_end)
+logfile_name =  os.path.join(splunk_home, 'etc', 'apps', 'optiv_TA_threat', 'logs', logfile_name_end)
 
-script_version = "3.20"
+script_version = "3.22"
 
 f = open(logfile_name,'w')
 
